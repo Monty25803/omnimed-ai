@@ -1,0 +1,74 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-edge
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: tier, operator: In, values: [web, gateway] }
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+    - from:
+        - podSelector: { matchLabels: { tier: web } }
+      ports: [{ port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-to-api
+spec:
+  podSelector:
+    matchLabels: { tier: api }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { tier: gateway } }
+---
+# Python services call clinical's /internal/authz and /patients endpoints.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-to-clinical
+spec:
+  podSelector:
+    matchLabels: { app: clinical }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { tier: api } }
+      ports: [{ port: 8081 }]
+---
+# Clinical re-grounds encounter notes against the AI guardrail before saving them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clinical-to-ai
+spec:
+  podSelector:
+    matchLabels: { app: ai }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: clinical } }
+      ports: [{ port: 8084 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-to-data
+spec:
+  podSelector:
+    matchLabels: { tier: data }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { tier: api } }
+    - from:
+        - podSelector: { matchLabels: { tier: web } }
+      ports: [{ port: 8080 }]

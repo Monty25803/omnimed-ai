@@ -1,0 +1,122 @@
+[
+  {
+    "id": "cap-amox",
+    "transcript": "Doctor: What brings you in today?\nPatient: I've had a fever and a cough with yellow sputum for three days, and I get short of breath climbing stairs.\nDoctor: Any chest pain?\nPatient: No chest pain.\nDoctor: On examination there are crackles at the right base. Temperature 38.4, pulse 102, BP 128/80, SpO2 94%.\nDoctor: I think this is community acquired pneumonia. Start amoxicillin 500 mg three times a day for 5 days. We will check a CBC and CRP. Follow up in two days.",
+    "icd10": ["J18.9"],
+    "rxnorm": ["723"]
+  },
+  {
+    "id": "htn-new",
+    "transcript": "Doctor: Your readings at home have been high.\nPatient: Yes, around 160 over 100, and I get headaches in the morning.\nDoctor: BP today is 162/98. This is essential hypertension. Start amlodipine 5 mg once daily. Let's repeat a creatinine and electrolytes. Review in four weeks.",
+    "icd10": ["I10"],
+    "rxnorm": ["17767"]
+  },
+  {
+    "id": "t2dm-metformin",
+    "transcript": "Patient: I'm passing urine frequently and I'm very thirsty all the time.\nDoctor: Your HbA1c came back at 8.2. You have type 2 diabetes. Start metformin 500 mg twice daily with meals. We'll repeat the HbA1c in three months.",
+    "icd10": ["E11.9"],
+    "rxnorm": ["6809"]
+  },
+  {
+    "id": "uti-cipro",
+    "transcript": "Patient: It burns when urinating and I need to go often since yesterday.\nPatient: No fever.\nDoctor: Abdomen is soft, mild suprapubic tenderness. This looks like a urinary tract infection. Give ciprofloxacin 500 mg BD for 3 days and send a urine culture.",
+    "icd10": ["N39.0"],
+    "rxnorm": ["2551"]
+  },
+  {
+    "id": "asthma-salbutamol",
+    "transcript": "Patient: I've been wheezing at night and my chest feels tight.\nDoctor: Known asthma since childhood?\nPatient: Yes.\nDoctor: Wheeze heard on auscultation, SpO2 96%. This is an asthma exacerbation. Start salbutamol inhaler 0.1 mg as needed and prednisolone 40 mg once daily for 5 days.",
+    "icd10": ["J45.909"],
+    "rxnorm": ["435", "8640"]
+  },
+  {
+    "id": "gerd-ppi",
+    "transcript": "Patient: I get a burning feeling behind my breastbone after meals, worse when lying down.\nDoctor: Sounds like acid reflux. Diagnosis is gastroesophageal reflux disease. Start pantoprazole 40 mg once daily before breakfast for 4 weeks.",
+    "icd10": ["K21.9"],
+    "rxnorm": ["40790"]
+  },
+  {
+    "id": "hypothyroid",
+    "transcript": "Patient: I feel tired all the time and I've gained weight.\nDoctor: Your TSH is raised. You have hypothyroidism. Start levothyroxine 0.05 mg once daily. Recheck TSH in six weeks.",
+    "icd10": ["E03.9"],
+    "rxnorm": ["10582"]
+  },
+  {
+    "id": "af-anticoag",
+    "transcript": "Patient: My heart has been racing on and off for a week.\nDoctor: The ECG shows atrial fibrillation. Start metoprolol 25 mg twice daily and warfarin 5 mg once daily. Check INR in 3 days.",
+    "icd10": ["I48.91"],
+    "rxnorm": ["6918", "11289"]
+  },
+  {
+    "id": "hf-furosemide",
+    "transcript": "Patient: My ankles are swollen and I get breathless lying flat.\nDoctor: There is pitting edema noted to the shins and crackles at both bases. This is heart failure. Start furosemide 40 mg once daily. Continue lisinopril. Order an NT-proBNP.",
+    "icd10": ["I50.9"],
+    "rxnorm": ["4603", "29046"]
+  },
+  {
+    "id": "urti-paracetamol",
+    "transcript": "Patient: Sore throat and runny nose for two days, body ache.\nDoctor: Throat is mildly red, chest is clear. This is a common cold. Take paracetamol 650 mg every 8 hours as needed. No antibiotics needed.",
+    "icd10": ["J06.9"],
+    "rxnorm": ["161"]
+  },
+  {
+    "id": "migraine",
+    "transcript": "Patient: I get one-sided headaches with nausea, and light bothers me.\nDoctor: Neurological exam is normal. This is migraine. Take ibuprofen 400 mg at onset, up to three times a day.",
+    "icd10": ["G43.909"],
+    "rxnorm": ["5640"]
+  },
+  {
+    "id": "gastro-ors",
+    "transcript": "Patient: Loose motions and vomiting since last night.\nDoctor: Mild dehydration, abdomen soft and non tender. Likely gastroenteritis. Start metronidazole 400 mg three times daily for 5 days and oral fluids.",
+    "icd10": ["K52.9"],
+    "rxnorm": ["6922"]
+  },
+  {
+    "id": "copd-azithro",
+    "transcript": "Patient: More breathless than usual and coughing up green sputum.\nDoctor: You have known COPD for years. Wheeze heard bilaterally. This is an exacerbation of chronic obstructive pulmonary disease. Start azithromycin 500 mg once daily for 3 days and prednisolone 40 mg once daily for 5 days.",
+    "icd10": ["J44.9"],
+    "rxnorm": ["18631", "8640"]
+  },
+  {
+    "id": "ckd-stop-nsaid",
+    "transcript": "Patient: I take ibuprofen most days for my knee.\nDoctor: Your eGFR has dropped to 45. This is chronic kidney disease stage 3. Stop ibuprofen. Use paracetamol 500 mg up to four times daily instead. Repeat creatinine in two weeks.",
+    "icd10": ["N18.3"],
+    "rxnorm": ["5640", "161"]
+  },
+  {
+    "id": "anemia",
+    "transcript": "Patient: I've been tired and dizzy for a month.\nDoctor: Hemoglobin is 9.1. This is anemia. We'll check a CBC with ferritin. Follow up next week.",
+    "icd10": ["D64.9"],
+    "rxnorm": []
+  },
+  {
+    "id": "dengue",
+    "transcript": "Patient: High fever for four days with severe body pain and a rash.\nDoctor: Platelets are 90 thousand and NS1 is positive. This is dengue fever. Take paracetamol 500 mg every six hours as needed. Avoid ibuprofen and aspirin. Repeat CBC tomorrow.",
+    "icd10": ["A90"],
+    "rxnorm": ["161"]
+  },
+  {
+    "id": "sinusitis",
+    "transcript": "Patient: Facial pain and blocked nose for ten days, with headache.\nDoctor: Tender over the maxillary sinuses. This is acute sinusitis. Start amoxicillin 500 mg three times daily for 7 days.",
+    "icd10": ["J01.90"],
+    "rxnorm": ["723"]
+  },
+  {
+    "id": "hx-not-assessment",
+    "transcript": "Patient: I have diabetes and high blood pressure for years. Today I have a cough and fever.\nDoctor: Chest has crackles on the left. I suspect pneumonia. Start azithromycin 500 mg once daily for 3 days. Continue metformin 500 mg twice daily.",
+    "icd10": ["J18.9"],
+    "rxnorm": ["18631", "6809"]
+  },
+  {
+    "id": "negated-dx",
+    "transcript": "Patient: Chest pain after lifting weights yesterday.\nDoctor: ECG and troponin are normal, so this is not a heart attack. There is tenderness over the chest wall. Take paracetamol 650 mg three times daily for 3 days.",
+    "icd10": [],
+    "rxnorm": ["161"]
+  },
+  {
+    "id": "sepsis-ceftriaxone",
+    "transcript": "Nurse: Temperature 39.2, heart rate 124, BP 88/54, respiratory rate 26.\nDoctor: She is confused and hypotensive. This is sepsis, likely from a urinary tract infection. Give ceftriaxone 2000 mg once daily. Check lactate and blood cultures now.",
+    "icd10": ["A41.9", "N39.0"],
+    "rxnorm": ["2193"]
+  }
+]

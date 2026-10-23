@@ -1,0 +1,71 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - external-secrets.yaml
+components:
+  - ../../components/platform
+patches:
+  # Secrets come from AWS Secrets Manager via External Secrets Operator, never from git.
+  - target: { kind: Secret, name: omnimed-secrets }
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: omnimed-secrets
+  - target: { kind: Secret, name: keycloak-admin }
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: keycloak-admin
+  - target: { kind: Deployment, labelSelector: "tier in (api,web,gateway)" }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target: { kind: HorizontalPodAutoscaler }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+  - target: { kind: ConfigMap, name: omnimed-config }
+    patch: |-
+      - op: replace
+        path: /data/REDIS_URL
+        value: rediss://master.omnimed-prod.cache.amazonaws.com:6379/0
+      - op: replace
+        path: /data/MINIO_ENDPOINT
+        value: s3.ap-south-1.amazonaws.com
+      - op: replace
+        path: /data/MINIO_SECURE
+        value: "true"
+      - op: replace
+        path: /data/VAULT_ADDR
+        value: https://vault.omnimed.internal:8200
+      - op: replace
+        path: /data/PUBLIC_WEB_URL
+        value: https://omnimed.example.org
+  # Production Keycloak runs in "start" mode against the RDS database (keycloak schema).
+  - target: { kind: Deployment, name: keycloak }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/args
+        value: ["start", "--import-realm", "--hostname=https://auth.omnimed.example.org"]
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KC_DB, value: postgres }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KC_DB_URL, valueFrom: { secretKeyRef: { name: keycloak-admin, key: db_url } } }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KC_DB_USERNAME, valueFrom: { secretKeyRef: { name: keycloak-admin, key: db_username } } }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: KC_DB_PASSWORD, valueFrom: { secretKeyRef: { name: keycloak-admin, key: db_password } } }

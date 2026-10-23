@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omnimed-config
+data:
+  REDIS_URL: redis://redis:6379/0
+  NATS_URL: nats://nats:4222
+  JWKS_URL: http://keycloak:8080/realms/omnimed/protocol/openid-connect/certs
+  ISSUER_SUFFIX: /realms/omnimed
+  CLINICAL_URL: http://clinical:8081
+  AI_URL: http://ai:8084
+  MINIO_ENDPOINT: minio:9000
+  MINIO_SECURE: "false"
+  VAULT_ADDR: http://vault:8200
+  ORTHANC_URL: http://orthanc:8042
+  PUBLIC_WEB_URL: https://omnimed.example.org
+  GATEWAY_URL: http://gateway:8000
+  KEYCLOAK_URL: http://keycloak:8080
+  ESCALATION_TIMEOUT_SECONDS: "120"
+  LLM_BASE_URL: https://api.openai.com/v1
+  LLM_MODEL: gpt-4o-mini
+---
+# Placeholder values for local clusters only. Production overlays replace this
+# Secret with an ExternalSecret synced from the cloud secret manager.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: omnimed-secrets
+type: Opaque
+stringData:
+  DATABASE_URL: postgres://omnimed:omnimed@postgres:5432/omnimed
+  INTERNAL_TOKEN: change-me-internal-token
+  MINIO_ACCESS_KEY: omnimed
+  MINIO_SECRET_KEY: omnimed-secret
+  VAULT_TOKEN: root
+  LLM_API_KEY: ""

@@ -1,0 +1,177 @@
+# In-cluster data stores for dev/test clusters. Production uses managed services
+# provisioned by infra/terraform (RDS, ElastiCache, S3 Object Lock, Vault with KMS auto-unseal).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: { app: postgres, tier: data }
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres, tier: data }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          image: omnimed/postgres
+          env:
+            - { name: POSTGRES_USER, value: omnimed }
+            - { name: POSTGRES_DB, value: omnimed }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: postgres-auth, key: password } }
+          ports: [{ name: pg, containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "omnimed", "-d", "omnimed"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 20Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports: [{ name: pg, port: 5432, targetPort: pg }]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-auth
+type: Opaque
+stringData:
+  password: omnimed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels: { app: redis, tier: data }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: redis }
+  template:
+    metadata:
+      labels: { app: redis, tier: data }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports: [{ name: redis, containerPort: 6379 }]
+          readinessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector: { app: redis }
+  ports: [{ name: redis, port: 6379, targetPort: redis }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  labels: { app: minio, tier: data }
+spec:
+  serviceName: minio
+  replicas: 1
+  selector:
+    matchLabels: { app: minio }
+  template:
+    metadata:
+      labels: { app: minio, tier: data }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: minio
+          image: pgsty/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: omnimed-secrets, key: MINIO_ACCESS_KEY } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: omnimed-secrets, key: MINIO_SECRET_KEY } }
+          ports: [{ name: s3, containerPort: 9000 }]
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: s3 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 20Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  selector: { app: minio }
+  ports: [{ name: s3, port: 9000, targetPort: s3 }]
+---
+# Dev-mode Vault keeps keys in memory: restarting it loses every DEK wrap key. Never use outside dev.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels: { app: vault, tier: data }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: vault }
+  template:
+    metadata:
+      labels: { app: vault, tier: data }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: vault
+          image: hashicorp/vault:1.17
+          env:
+            - { name: SKIP_SETCAP, value: "true" }
+            - { name: VAULT_DEV_LISTEN_ADDRESS, value: "0.0.0.0:8200" }
+            - name: VAULT_DEV_ROOT_TOKEN_ID
+              valueFrom: { secretKeyRef: { name: omnimed-secrets, key: VAULT_TOKEN } }
+          ports: [{ name: http, containerPort: 8200 }]
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+spec:
+  selector: { app: vault }
+  ports: [{ name: http, port: 8200, targetPort: http }]

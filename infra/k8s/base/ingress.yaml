@@ -1,0 +1,110 @@
+# The API gateway mirrors infra/traefik/routes.yml: prefix routing, prefix strip,
+# rate limiting and security headers in front of the four API services.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-routes
+data:
+  routes.yml: |
+    http:
+      middlewares:
+        ratelimit:
+          rateLimit: { average: 300, burst: 600 }
+        strip-api:
+          stripPrefixRegex: { regex: ["^/api/[a-z]+"] }
+        secure-headers:
+          headers: { frameDeny: true, contentTypeNosniff: true, referrerPolicy: no-referrer, stsSeconds: 31536000 }
+      routers:
+        clinical: { rule: "PathPrefix(`/api/clinical`)", service: clinical, middlewares: [ratelimit, strip-api, secure-headers] }
+        diagnostics: { rule: "PathPrefix(`/api/diag`)", service: diagnostics, middlewares: [ratelimit, strip-api, secure-headers] }
+        lifesciences: { rule: "PathPrefix(`/api/life`)", service: lifesciences, middlewares: [ratelimit, strip-api, secure-headers] }
+        ai: { rule: "PathPrefix(`/api/ai`)", service: ai, middlewares: [ratelimit, strip-api, secure-headers] }
+      services:
+        clinical: { loadBalancer: { servers: [{ url: "http://clinical:8081" }] } }
+        diagnostics: { loadBalancer: { servers: [{ url: "http://diagnostics:8082" }] } }
+        lifesciences: { loadBalancer: { servers: [{ url: "http://lifesciences:8083" }] } }
+        ai: { loadBalancer: { servers: [{ url: "http://ai:8084" }] } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels: { app: gateway, tier: gateway }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels: { app: gateway, tier: gateway }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: traefik
+          image: traefik:v3.1
+          args:
+            - --providers.file.directory=/etc/traefik/dynamic
+            - --entrypoints.web.address=:8000
+            - --ping=true
+            - --accesslog=true
+          ports: [{ name: http, containerPort: 8000 }]
+          readinessProbe:
+            httpGet: { path: /ping, port: 8080 }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: routes, mountPath: /etc/traefik/dynamic, readOnly: true }
+      volumes:
+        - name: routes
+          configMap: { name: gateway-routes }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+spec:
+  selector: { app: gateway }
+  ports: [{ name: http, port: 8000, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omnimed
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-protocols: TLSv1.3
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [omnimed.example.org]
+      secretName: omnimed-tls
+  rules:
+    - host: omnimed.example.org
+      http:
+        paths:
+          - path: /api/clinical
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { name: http } } }
+          - path: /api/diag
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { name: http } } }
+          - path: /api/life
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { name: http } } }
+          - path: /api/ai
+            pathType: Prefix
+            backend: { service: { name: gateway, port: { name: http } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: web, port: { name: http } } }

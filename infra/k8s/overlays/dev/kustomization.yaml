@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+components:
+  - ../../components/platform
+  - ../../components/local-data
+patches:
+  - target: { kind: Deployment, labelSelector: "tier in (api,web,gateway)" }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: HorizontalPodAutoscaler }
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+  - target: { kind: Ingress, name: omnimed }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: omnimed.localtest.me
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: omnimed.localtest.me
+  - target: { kind: ConfigMap, name: omnimed-config }
+    patch: |-
+      - op: replace
+        path: /data/PUBLIC_WEB_URL
+        value: https://omnimed.localtest.me

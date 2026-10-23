@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - nats.yaml
+  - orthanc.yaml
+  - keycloak.yaml
+images:
+  - name: omnimed/keycloak
+    newName: ghcr.io/omnimed/keycloak
+    newTag: "0.1.0"

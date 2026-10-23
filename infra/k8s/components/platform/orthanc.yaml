@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: orthanc
+  labels: { app: orthanc, tier: pacs }
+spec:
+  serviceName: orthanc
+  replicas: 1
+  selector:
+    matchLabels: { app: orthanc }
+  template:
+    metadata:
+      labels: { app: orthanc, tier: pacs }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: orthanc
+          image: orthancteam/orthanc:24.9.1
+          env:
+            - { name: DICOM_WEB_PLUGIN_ENABLED, value: "true" }
+            - { name: ORTHANC__NAME, value: "OmniMed PACS" }
+            # Only reachable from the diagnostics service (NetworkPolicy); diagnostics enforces ABAC.
+            - { name: ORTHANC__AUTHENTICATION_ENABLED, value: "false" }
+            - { name: ORTHANC__REMOTE_ACCESS_ALLOWED, value: "true" }
+            - { name: ORTHANC__DICOM_WEB__ENABLE, value: "true" }
+            - { name: ORTHANC__DICOM_WEB__ROOT, value: "/dicom-web/" }
+          ports: [{ name: http, containerPort: 8042 }]
+          readinessProbe:
+            tcpSocket: { port: http }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "2", memory: 4Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/orthanc/db }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 100Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orthanc
+spec:
+  selector: { app: orthanc }
+  ports: [{ name: http, port: 8042, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orthanc-diagnostics-only
+spec:
+  podSelector:
+    matchLabels: { app: orthanc }
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: diagnostics } }
+      ports: [{ port: 8042 }]

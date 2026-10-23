@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "OmniMed",
+    "slug": "omnimed-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "ai.omnimed.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan patient wristbands and medication barcodes for safe administration.",
+        "NSLocationWhenInUseUsageDescription": "Verify that field visits take place at the doctor's clinic."
+      }
+    },
+    "android": {
+      "package": "ai.omnimed.mobile",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "VIBRATE"]
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Scan patient wristbands and medication barcodes for safe administration." }],
+      ["expo-location", { "locationWhenInUsePermission": "Verify that field visits take place at the doctor's clinic." }],
+      "expo-secure-store"
+    ],
+    "extra": {
+      "gatewayUrl": "http://10.0.2.2:8000",
+      "keycloakUrl": "http://10.0.2.2:8080"
+    }
+  }
+}

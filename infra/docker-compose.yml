@@ -1,0 +1,192 @@
+name: omnimed
+
+x-service-env: &service-env
+  DATABASE_URL: postgres://omnimed:omnimed@postgres:5432/omnimed
+  REDIS_URL: redis://redis:6379/0
+  NATS_URL: nats://nats:4222
+  JWKS_URL: http://keycloak:8080/realms/omnimed/protocol/openid-connect/certs
+  ISSUER_SUFFIX: /realms/omnimed
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token}
+  CLINICAL_URL: http://clinical:8081
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: omnimed
+  MINIO_SECRET_KEY: omnimed-secret
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: omnimed
+      POSTGRES_PASSWORD: omnimed
+      POSTGRES_DB: omnimed
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omnimed -d omnimed"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports: ["4222:4222", "8222:8222"]
+    volumes:
+      - natsdata:/data
+
+  minio:
+    # Official minio/minio images are no longer published on Docker Hub; pgsty/minio is a source rebuild.
+    image: pgsty/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: omnimed
+      MINIO_ROOT_PASSWORD: omnimed-secret
+    ports: ["9000:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      retries: 30
+
+  orthanc:
+    image: orthancteam/orthanc:24.9.1
+    environment:
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC__NAME: "OmniMed PACS"
+      ORTHANC__AUTHENTICATION_ENABLED: "false"
+      ORTHANC__REMOTE_ACCESS_ALLOWED: "true"
+      ORTHANC__MAXIMUM_STORAGE_SIZE: "0"
+      ORTHANC__DICOM_WEB__ENABLE: "true"
+      ORTHANC__DICOM_WEB__ROOT: "/dicom-web/"
+    volumes:
+      - orthancdata:/var/lib/orthanc/db
+
+  vault:
+    image: hashicorp/vault:1.17
+    cap_add: ["IPC_LOCK"]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports: ["8200:8200"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports: ["8080:8080"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 60
+
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --entrypoints.web.address=:8000
+      - --entrypoints.websecure.address=:8443
+      - --entrypoints.websecure.http.tls=true
+      - --ping=true
+      - --accesslog=true
+    ports: ["8000:8000", "8443:8443"]
+    volumes:
+      - ./traefik:/etc/traefik/dynamic:ro
+
+  clinical:
+    build: ../services/clinical
+    environment:
+      <<: *service-env
+      PORT: "8081"
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+      AI_URL: http://ai:8084
+      ESCALATION_TIMEOUT_SECONDS: ${ESCALATION_TIMEOUT_SECONDS:-120}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      nats: { condition: service_started }
+      vault: { condition: service_started }
+      keycloak: { condition: service_healthy }
+
+  diagnostics:
+    build:
+      context: ../services
+      dockerfile: diagnostics/Dockerfile
+    environment:
+      <<: *service-env
+      ORTHANC_URL: http://orthanc:8042
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      clinical: { condition: service_started }
+      orthanc: { condition: service_started }
+
+  lifesciences:
+    build:
+      context: ../services
+      dockerfile: lifesciences/Dockerfile
+    environment:
+      <<: *service-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      clinical: { condition: service_started }
+
+  ai:
+    build:
+      context: ../services
+      dockerfile: ai/Dockerfile
+    environment:
+      <<: *service-env
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      WHISPER_URL: ${WHISPER_URL:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      clinical: { condition: service_started }
+
+  web:
+    build: ../apps/web
+    environment:
+      GATEWAY_URL: http://traefik:8000
+      KEYCLOAK_URL: http://keycloak:8080
+    ports: ["3000:3000"]
+    depends_on: [traefik, keycloak]
+
+  tests:
+    build: ../tests
+    profiles: ["test"]
+    environment:
+      <<: *service-env
+      GATEWAY_URL: http://traefik:8000
+      KEYCLOAK_URL: http://keycloak:8080
+      ORTHANC_URL: http://orthanc:8042
+    volumes:
+      - ../tests:/tests
+    depends_on: [traefik]
+
+volumes:
+  pgdata:
+  natsdata:
+  miniodata:
+  orthancdata:

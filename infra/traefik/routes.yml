@@ -1,0 +1,57 @@
+http:
+  middlewares:
+    ratelimit:
+      rateLimit:
+        average: 300
+        burst: 600
+    strip-api:
+      stripPrefixRegex:
+        regex:
+          - "^/api/[a-z]+"
+    secure-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: no-referrer
+        stsSeconds: 31536000
+
+  routers:
+    clinical:
+      rule: PathPrefix(`/api/clinical`)
+      entryPoints: [web, websecure]
+      service: clinical
+      middlewares: [ratelimit, strip-api, secure-headers]
+    diagnostics:
+      rule: PathPrefix(`/api/diag`)
+      entryPoints: [web, websecure]
+      service: diagnostics
+      middlewares: [ratelimit, strip-api, secure-headers]
+    lifesciences:
+      rule: PathPrefix(`/api/life`)
+      entryPoints: [web, websecure]
+      service: lifesciences
+      middlewares: [ratelimit, strip-api, secure-headers]
+    ai:
+      rule: PathPrefix(`/api/ai`)
+      entryPoints: [web, websecure]
+      service: ai
+      middlewares: [ratelimit, strip-api, secure-headers]
+
+  services:
+    clinical:
+      loadBalancer:
+        servers: [{ url: "http://clinical:8081" }]
+    diagnostics:
+      loadBalancer:
+        servers: [{ url: "http://diagnostics:8082" }]
+    lifesciences:
+      loadBalancer:
+        servers: [{ url: "http://lifesciences:8083" }]
+    ai:
+      loadBalancer:
+        servers: [{ url: "http://ai:8084" }]
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS13

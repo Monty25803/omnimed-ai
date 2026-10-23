@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: omnimed
+  labels:
+    # Application pods meet "restricted"; Orthanc and Postgres images need root, so enforcement is "baseline".
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diagnostics
+  labels: { app: diagnostics, tier: api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: diagnostics }
+  template:
+    metadata:
+      labels: { app: diagnostics, tier: api }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: diagnostics
+          image: omnimed/diagnostics
+          ports: [{ name: http, containerPort: 8082 }]
+          envFrom:
+            - configMapRef: { name: omnimed-config }
+            - secretRef: { name: omnimed-secrets }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: diagnostics
+spec:
+  selector: { app: diagnostics }
+  ports: [{ name: http, port: 8082, targetPort: http }]

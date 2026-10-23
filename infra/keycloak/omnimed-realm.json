@@ -1,0 +1,49 @@
+{
+  "realm": "omnimed",
+  "enabled": true,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 28800,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      { "name": "doctor" },
+      { "name": "nurse" },
+      { "name": "pharmacist" },
+      { "name": "lab" },
+      { "name": "mr" },
+      { "name": "patient" },
+      { "name": "admin" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "omnimed-web",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"]
+    },
+    {
+      "clientId": "omnimed-mobile",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["omnimed://*"]
+    }
+  ],
+  "users": [
+    { "username": "dr.rao", "email": "dr.rao@omnimed.local", "firstName": "Anand", "lastName": "Rao", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["doctor"] },
+    { "username": "dr.sen", "email": "dr.sen@omnimed.local", "firstName": "Kavya", "lastName": "Sen", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["doctor"] },
+    { "username": "dr.mehta", "email": "dr.mehta@omnimed.local", "firstName": "Rohit", "lastName": "Mehta", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["doctor"] },
+    { "username": "nurse.anita", "email": "nurse.anita@omnimed.local", "firstName": "Anita", "lastName": "Joseph", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["nurse"] },
+    { "username": "nurse.priya", "email": "nurse.priya@omnimed.local", "firstName": "Priya", "lastName": "Menon", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["nurse"] },
+    { "username": "pharm.kiran", "email": "pharm.kiran@omnimed.local", "firstName": "Kiran", "lastName": "Shetty", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["pharmacist"] },
+    { "username": "lab.suresh", "email": "lab.suresh@omnimed.local", "firstName": "Suresh", "lastName": "Pillai", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["lab"] },
+    { "username": "mr.vikram", "email": "mr.vikram@omnimed.local", "firstName": "Vikram", "lastName": "Desai", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["mr"] },
+    { "username": "patient.lakshmi", "email": "lakshmi@omnimed.local", "firstName": "Lakshmi", "lastName": "Iyer", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["patient"] },
+    { "username": "admin.audit", "email": "audit@omnimed.local", "firstName": "Audit", "lastName": "Officer", "enabled": true, "emailVerified": true, "credentials": [{ "type": "password", "value": "omnimed", "temporary": false }], "realmRoles": ["admin"] }
+  ]
+}
