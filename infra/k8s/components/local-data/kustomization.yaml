@@ -4,5 +4,5 @@ resources:
   - data.yaml
 images:
   - name: omnimed/postgres
-    newName: ghcr.io/omnimed/postgres
+    newName: ghcr.io/monty25803/omnimed/postgres
     newTag: "0.1.0"

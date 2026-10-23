@@ -18,17 +18,17 @@ resources:
   - autoscaling.yaml
 images:
   - name: omnimed/clinical
-    newName: ghcr.io/omnimed/clinical
+    newName: ghcr.io/monty25803/omnimed/clinical
     newTag: "0.1.0"
   - name: omnimed/diagnostics
-    newName: ghcr.io/omnimed/diagnostics
+    newName: ghcr.io/monty25803/omnimed/diagnostics
     newTag: "0.1.0"
   - name: omnimed/lifesciences
-    newName: ghcr.io/omnimed/lifesciences
+    newName: ghcr.io/monty25803/omnimed/lifesciences
     newTag: "0.1.0"
   - name: omnimed/ai
-    newName: ghcr.io/omnimed/ai
+    newName: ghcr.io/monty25803/omnimed/ai
     newTag: "0.1.0"
   - name: omnimed/web
-    newName: ghcr.io/omnimed/web
+    newName: ghcr.io/monty25803/omnimed/web
     newTag: "0.1.0"

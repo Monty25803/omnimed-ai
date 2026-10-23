@@ -39,8 +39,8 @@ k8s/
     └── prod/               3 replicas, managed AWS data, secrets via External Secrets
 ```
 
-The manifests reference `ghcr.io/omnimed/*:0.1.0` images, which are not published. Build and push your own, then
-point the overlay at them:
+The manifests use `ghcr.io/monty25803/omnimed/<name>:0.1.0`, which CI publishes from the `v0.1.0` tag (images:
+`clinical`, `diagnostics`, `lifesciences`, `ai`, `web`, `postgres`, `keycloak`). To build and use your own instead:
 
 ```bash
 R=<registry>   # for example ghcr.io/<your-user>
@@ -51,7 +51,7 @@ docker build -t $R/postgres:0.1.0 infra/postgres
 docker build -t $R/keycloak:0.1.0 infra/keycloak
 # push them, then in each overlay you use:
 cd infra/k8s/overlays/dev
-for s in clinical diagnostics lifesciences ai web postgres keycloak; do kustomize edit set image ghcr.io/omnimed/$s=$R/$s:0.1.0; done
+for s in clinical diagnostics lifesciences ai web postgres keycloak; do kustomize edit set image omnimed/$s=$R/$s:0.1.0; done
 ```
 
 The Python services build from `services/` because they share `services/common`. Validate the rendered manifests with:

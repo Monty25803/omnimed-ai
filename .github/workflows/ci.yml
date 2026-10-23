@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Typecheck and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Web typecheck
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit
+
+      - name: Mobile typecheck
+        working-directory: apps/mobile
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Terraform fmt and validate
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Kubernetes manifests
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          for overlay in dev prod; do
+            echo "== $overlay"
+            kubectl kustomize infra/k8s/overlays/$overlay | ./kubeconform -strict -ignore-missing-schemas -summary
+          done
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose -f infra/docker-compose.yml up -d --build --wait --wait-timeout 900
+
+      - name: Wait for the services behind the gateway
+        run: |
+          for svc in clinical diag life ai; do
+            for i in $(seq 1 60); do
+              curl -fsS "http://localhost:8000/api/$svc/health" >/dev/null && break
+              sleep 5
+            done
+            curl -fsS "http://localhost:8000/api/$svc/health"; echo
+          done
+
+      - name: Run the fast suite
+        run: docker compose -f infra/docker-compose.yml --profile test run --rm tests pytest -q -ra -m "not slow"
+
+      - name: Service logs
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --no-color --tail=300
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: tests/results/
+          if-no-files-found: ignore
+
+  images:
+    name: Publish ${{ matrix.name }}
+    needs: [static, integration]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: clinical, context: services/clinical, file: services/clinical/Dockerfile }
+          - { name: diagnostics, context: services, file: services/diagnostics/Dockerfile }
+          - { name: lifesciences, context: services, file: services/lifesciences/Dockerfile }
+          - { name: ai, context: services, file: services/ai/Dockerfile }
+          - { name: web, context: apps/web, file: apps/web/Dockerfile }
+          - { name: postgres, context: infra/postgres, file: infra/postgres/Dockerfile }
+          - { name: keycloak, context: infra/keycloak, file: infra/keycloak/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/omnimed/${{ matrix.name }}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

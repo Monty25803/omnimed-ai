@@ -11,7 +11,8 @@
 ![FHIR](https://img.shields.io/badge/HL7-FHIR%20R4-E34F26)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-Kustomize-326CE5?logo=kubernetes&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-AWS-7B42BC?logo=terraform&logoColor=white)
-![Tests](https://img.shields.io/badge/integration%20tests-39%20passing-2EA44F)
+[![CI](https://github.com/Monty25803/omnimed-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Monty25803/omnimed-ai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [Highlights](#highlights) · [Architecture](#architecture) · [Quick start](#quick-start) · [Personas](#personas) · [Safety and security](#safety-and-security) · [Test results](#verified-test-results) · [Deploy](#deploy) · [Docs](#documentation) · [Roadmap](docs/IMPROVEMENTS.md)
 
@@ -234,8 +235,8 @@ endpoints and settings.
 
 ### Kubernetes
 
-Build and push the images first, because the manifests reference `ghcr.io/omnimed/*` images that are not published.
-[`infra/README.md`](infra#kubernetes) has the commands.
+CI publishes every image to GitHub Container Registry as `ghcr.io/monty25803/omnimed/<name>`, and the manifests
+use the `0.1.0` release tag. To use your own registry instead, see [`infra/README.md`](infra#kubernetes).
 
 ```bash
 kubectl apply -k infra/k8s/overlays/dev    # self-contained, in-cluster data services
@@ -269,6 +270,7 @@ Then install the External Secrets Operator and ingress-nginx, set the role ARN f
 
 ```text
 .
+├── .github/workflows/    CI: checks, integration tests, image publishing
 ├── apps/
 │   ├── web/              Next.js persona portals and DICOM viewer
 │   └── mobile/           Expo app
@@ -311,6 +313,18 @@ Known gaps and suggested next features, prioritised by patient safety, are in [d
 - Live ABDM sandbox integration, an SMS provider, and a validated handwriting OCR model
 - Serving imaging directly from the gateway or signed storage URLs, bypassing the Next.js proxy
 - Medication reconciliation, a sepsis bundle tracker, antimicrobial stewardship, and an offline-first mobile eMAR
+
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request:
+
+1. **Typecheck and validate:** TypeScript for web and mobile, `terraform fmt` and `validate`, and kubeconform on both Kubernetes overlays.
+2. **Integration tests:** starts the full Compose stack and runs the fast suite (everything except the 500 MB DICOM test). Service unit tests run inside the image builds.
+3. **Publish:** after both pass on `main` or a `v*` tag, builds and pushes all seven images with `latest`, commit SHA and version tags.
+
+## License
+
+[MIT](LICENSE).
 
 ## Disclaimer
 

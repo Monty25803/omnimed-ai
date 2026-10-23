@@ -6,5 +6,5 @@ resources:
   - keycloak.yaml
 images:
   - name: omnimed/keycloak
-    newName: ghcr.io/omnimed/keycloak
+    newName: ghcr.io/monty25803/omnimed/keycloak
     newTag: "0.1.0"
