@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from conftest import GATEWAY
+from conftest import GATEWAY, hl7_potassium
 
 
 def _png(w: int = 160, h: int = 48) -> str:
@@ -37,6 +37,7 @@ def test_doctor(as_user):
     blocked = dr.post("clinical/prescriptions", json={"patient_id": "P0001", "rxcui": "723", "strength_mg": 500, "frequency": "TDS", "duration_days": 5})
     assert blocked.status_code == 409
 
+    as_user("lab.suresh").ok("POST", "diag/lims/hl7", json={"message": hl7_potassium("MRN-100001", 6.8)})
     dx = dr.ok("POST", "ai/differential", json={"patient_id": "P0001", "symptoms_text": "weakness and palpitations"})
     ranked = next(v for k, v in dx.items() if isinstance(v, list) and v and isinstance(v[0], dict) and "icd10" in v[0])
     assert ranked[0]["display"] == "Hyperkalemia", ranked[:3]
