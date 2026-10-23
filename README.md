@@ -13,7 +13,7 @@
 ![Terraform](https://img.shields.io/badge/Terraform-AWS-7B42BC?logo=terraform&logoColor=white)
 ![Tests](https://img.shields.io/badge/integration%20tests-39%20passing-2EA44F)
 
-[Highlights](#highlights) · [Architecture](#architecture) · [Quick start](#quick-start) · [Personas](#personas) · [Test results](#verified-test-results) · [Deploy](#deploy) · [Roadmap](docs/IMPROVEMENTS.md)
+[Highlights](#highlights) · [Architecture](#architecture) · [Quick start](#quick-start) · [Personas](#personas) · [Safety and security](#safety-and-security) · [Test results](#verified-test-results) · [Deploy](#deploy) · [Docs](#documentation) · [Roadmap](docs/IMPROVEMENTS.md)
 
 </div>
 
@@ -25,8 +25,8 @@
 ## Highlights
 
 - **Clinical synapse.** A critical lab value (for example potassium 6.8) reaches the doctor, nurse and pharmacist in under 100 ms, holds the risky drug, opens a STAT ECG task and escalates if nobody responds.
-- **Grounded AI.** The ambient scribe, differential and patient explanations pass through a guardrail that rejects any drug, diagnosis or test not present in the source transcript or patient record. The server re-checks every note, so a client cannot bypass it.
-- **Safety at the point of care.** Allergy hard stops, drug interactions, dose ranges, barcode eMAR with wrong-patient blocking, and MEWS/qSOFA early-warning scores.
+- **Grounded AI.** Every scribe note, rule-based or LLM-drafted, passes through a guardrail that rejects any drug, diagnosis, test or strength not supported by the transcript or patient record. The clinical service re-checks each note before saving, so a client cannot bypass it.
+- **Safety at the point of care.** Allergy and interaction hard stops, renal and potassium limits from the latest labs, maximum daily dose, barcode eMAR with wrong-patient blocking, and MEWS/qSOFA early-warning scores.
 - **Diagnostics.** HL7 v2 and ASTM analyzer ingest, digitally signed PDF reports with public QR verification, and a browser DICOM viewer backed by Orthanc that loads a 500 MB CT series as one volume.
 - **Life sciences with compliance built in.** Geofenced medical-rep check-ins, consent-gated e-detailing, and a signed drug-sample ledger.
 - **Security by design.** Keycloak OIDC, attribute-based access control across facilities and care teams, Vault envelope encryption for PHI, and a hash-chained audit ledger mirrored to write-once (Object Lock) storage.
@@ -85,6 +85,31 @@ flowchart LR
 | [`infra`](infra) | Docker Compose, Kustomize, Terraform | Local stack, Kubernetes dev/prod overlays, AWS production infrastructure |
 | [`tests`](tests) | pytest | End-to-end tests for the specification's test cases |
 
+### What happens when a lab value is critical
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant AN as Lab analyzer
+    participant DX as diagnostics
+    participant NS as NATS (SYNAPSE stream)
+    participant CL as clinical
+    participant CT as Care team (doctor, nurse, pharmacist)
+
+    AN->>DX: HL7 ORU: potassium 6.8 mmol/L
+    DX->>DX: Parse, code to LOINC 2823-3, classify as critical high
+    DX->>NS: publish lab.panic
+    NS->>CL: deliver (durable, acknowledged)
+    CL->>CL: Hold potassium-sparing drugs, flag ACE inhibitors for review
+    CL->>CL: Raise STAT ECG task, write audit entries
+    CL-->>CT: SSE alert to every care-team member (p95 78 ms end to end)
+    alt Nobody acknowledges within ESCALATION_TIMEOUT_SECONDS
+        CL-->>CT: Escalate to the next tier
+    end
+```
+
+Other rules cover low glucose, high INR, low platelets and high troponin; see [`services/clinical`](services/clinical#synapse-rules).
+
 ## Quick start
 
 **Prerequisites:** Docker Desktop with at least 8 GB of memory. Node.js 20 is needed only for the mobile app.
@@ -95,7 +120,8 @@ cd omnimed-ai
 docker compose -f infra/docker-compose.yml up -d --build
 ```
 
-The first build takes a few minutes. Then open:
+The first build takes a few minutes, and Keycloak needs about a minute more to import the realm. Check with
+`docker compose -f infra/docker-compose.yml ps` until every service is running or healthy, then open:
 
 | URL | What |
 |---|---|
@@ -127,6 +153,21 @@ Every account's password is `omnimed`.
 | `mr.vikram` | Medical rep | Geofenced check-in, consented detailing, signed samples |
 | `patient.lakshmi` | Patient | Results in plain language and Hindi, consents, health locker |
 | `admin.audit` | Auditor | Verify the audit chain and WORM mirror |
+
+## Safety and security
+
+| Concern | How it is handled |
+|---|---|
+| AI inventing clinical facts | Grounding guardrail on every note, enforced server-side and fail-closed; rejections are audited |
+| Unsafe prescriptions | Hard stops for allergies, major interactions, renal limits, high potassium and maximum daily dose; warnings for cross-reactivity, minor interactions and duplicates |
+| Critical results missed | Event-driven fan-out to the whole care team, automatic drug holds, STAT tasks, tiered escalation |
+| Wrong-patient administration | eMAR scans the wristband and the medication barcode, blocks wrong drug or strength, and requires a reason outside the dose window |
+| Who can see what | Keycloak OIDC with JWT verification; ABAC by role, facility, care team, shift and patient consent |
+| Data at rest | PHI fields encrypted with Vault transit data keys; KMS-encrypted RDS, S3 and EKS secrets in production |
+| Tampering | Hash-chained audit ledger, each entry mirrored to an Object Lock (compliance mode) bucket, with a verify endpoint |
+| Report forgery | ECDSA P-256 signed lab reports; anyone can verify a QR code at `/verify` |
+| Field-force compliance | MR check-ins geofenced and consent-gated; samples signed and capped; MRs never see patient data |
+| Network | Default-deny Kubernetes NetworkPolicies, non-root containers, TLS 1.3 at the gateway, rate limiting, security headers |
 
 ## Verified test results
 
@@ -161,11 +202,40 @@ npm install
 npx expo start
 ```
 
-`app.json` points the Android emulator at the host machine (`10.0.2.2:8000` for the gateway and `10.0.2.2:8080` for Keycloak). Change the `extra` block to your machine's LAN address for a physical device.
+`app.json` points the Android emulator at the host machine (`10.0.2.2:8000` for the gateway and `10.0.2.2:8080` for Keycloak). Change the `extra` block to your machine's LAN address for a physical device. See [`apps/mobile`](apps/mobile).
+
+## Development
+
+```bash
+# rebuild and restart one service after a change (its unit tests run during the build)
+docker compose -f infra/docker-compose.yml up -d --build clinical
+
+# follow its logs
+docker compose -f infra/docker-compose.yml logs -f clinical
+
+# run the web portal with hot reload against the running stack
+cd apps/web && npm install && npm run dev
+```
+
+Service names are `clinical`, `diagnostics`, `lifesciences`, `ai` and `web`. Each component's README lists its
+endpoints and settings.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Sign-in fails right after startup | Keycloak is still importing the realm; wait for it to show as healthy |
+| A port is already in use | Stop whatever uses 3000, 5432, 8000 or 8080, or change the host port in `infra/docker-compose.yml` |
+| Seed data missing or stale | `docker compose -f infra/docker-compose.yml down -v`, then start again |
+| Builds run out of memory | Give Docker at least 8 GB |
+| Alerts escalate during tests | Expected: the panic test does not acknowledge its alerts |
 
 ## Deploy
 
 ### Kubernetes
+
+Build and push the images first, because the manifests reference `ghcr.io/omnimed/*` images that are not published.
+[`infra/README.md`](infra#kubernetes) has the commands.
 
 ```bash
 kubectl apply -k infra/k8s/overlays/dev    # self-contained, in-cluster data services
@@ -218,6 +288,20 @@ Then install the External Secrets Operator and ingress-nginx, set the role ARN f
 ├── tests/                End-to-end specification tests
 └── docs/IMPROVEMENTS.md  Results, known gaps and roadmap
 ```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [services/clinical](services/clinical) | Clinical API, access rules, synapse rules, configuration |
+| [services/diagnostics](services/diagnostics) | Lab and imaging API, DICOM volume path |
+| [services/ai](services/ai) | Scribe, guardrail, LLM and speech-to-text settings, vocabulary limits |
+| [services/lifesciences](services/lifesciences) | Medical-rep API and compliance rules |
+| [apps/web](apps/web) | Portal pages, token handling, DICOM viewer |
+| [apps/mobile](apps/mobile) | Mobile screens and device setup |
+| [infra](infra) | Local ports, Kubernetes layout, image builds, Terraform steps |
+| [tests](tests) | What each test proves and how to run it |
+| [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Measured results, defects fixed, known gaps, next features |
 
 ## Roadmap
 

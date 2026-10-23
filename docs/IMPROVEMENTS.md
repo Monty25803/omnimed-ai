@@ -73,7 +73,7 @@ External Secrets syncs.
 2. **OCR on distorted handwriting is unreliable.** Tesseract with upscaling reads the printed sample, but lines with a
    missing frequency are only flagged, not resolved. Keep the mandatory pharmacist confirmation; evaluate a handwriting
    model (for example TrOCR fine-tuned on Indian prescriptions) with a measured error rate.
-3. **Rule-based scribe vocabulary is small** (about 30 diagnoses, 40 drugs, 25 labs). Load licensed SNOMED CT (India
+3. **Rule-based scribe vocabulary is small** (25 ICD-10 diagnoses, 36 RxNorm drugs, 32 LOINC tests). Load licensed SNOMED CT (India
    edition), RxNorm and LOINC releases into `ai.concepts` and re-run TC-AI-04 on a larger independent corpus.
 4. **Lesion assist is a threshold-based demonstrator**, not a validated model. It must stay labelled as such until a
    trained, regulator-cleared model replaces it.
